@@ -48,10 +48,25 @@ class TaskActivity : AppCompatActivity() {
             title = projectName
 
             // TODO: initialize a connection to a realm containing all of the Tasks in this project
+            val config = SyncConfiguration.Builder(user!!, partition)
+                .build()
+
+            Realm.getInstanceAsync(config, object : Realm.Callback() {
+                override fun onSuccess(realm: Realm) {
+                    this@TaskActivity.projectRealm = realm
+                    setUpRecyclerView(realm, user, partition)
+                }
+
+            })
         }
     }
 
-    // TODO: always ensure that the project realm closes when the activity ends via the onStop lifecycle method
+    override fun onStop() {
+        super.onStop()
+        user.run {
+            projectRealm.close()
+        }
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +84,13 @@ class TaskActivity : AppCompatActivity() {
                 .setPositiveButton("Create") { dialog, _ -> run {
                     dialog.dismiss()
                     // TODO: Add a new task to the project by inserting into the realm when the user clicks "create" for a new task.
+                    val task = Task(
+                        input.text.toString()
+                    )
+
+                    projectRealm.executeTransactionAsync { realm ->
+                        realm.insert(task)
+                    }
                 }
                 }
                 .setNegativeButton("Cancel") { dialog, _ -> dialog.cancel()
@@ -81,7 +103,11 @@ class TaskActivity : AppCompatActivity() {
         }
     }
 
-    // TODO: always ensure that the project realm closes when the activity ends via the onDestroy lifecycle method
+    override fun onDestroy() {
+        super.onDestroy()
+        recyclerView.adapter = null
+        projectRealm.close()
+    }
 
 
     private fun setUpRecyclerView(realm: Realm, user: User?, partition: String) {
@@ -90,6 +116,7 @@ class TaskActivity : AppCompatActivity() {
         // pass the adapter a collection of Tasks from the realm
         // sort this collection so that the displayed order of Tasks remains stable across updates
         // TODO: Query the realm for Task objects, sorted by a stable order that remains consistent between runs.
+        adapter = TaskAdapter(realm.where<Task>().sort("id").findAll(), user!!, partition)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
         recyclerView.setHasFixedSize(true)

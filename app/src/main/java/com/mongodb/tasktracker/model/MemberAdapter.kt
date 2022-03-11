@@ -17,12 +17,17 @@ import org.bson.Document
 * in a RecyclerView.
 */
 
-internal class MemberAdapter(private val data: ArrayList<Member>, private val user : io.realm.mongodb.User) :
+internal class MemberAdapter(
+    private val data: ArrayList<Member>,
+    private val user: io.realm.mongodb.User
+) :
     RecyclerView.Adapter<MemberAdapter.MemberViewHolder>() {
-    lateinit var parent : ViewGroup
+    lateinit var parent: ViewGroup
 
-    override fun onCreateViewHolder(parent: ViewGroup,
-                                    viewType: Int): MemberAdapter.MemberViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int
+    ): MemberAdapter.MemberViewHolder {
         // save a reference to the parent view so we can create dialogs later
         this.parent = parent
         Log.i(TAG(), "Displaying a list of project members. Size: ${data.size}")
@@ -46,6 +51,24 @@ internal class MemberAdapter(private val data: ArrayList<Member>, private val us
                         // TODO: Call the `removeTeamMember` Realm Function through `taskApp` to remove the selected user from the project.
                         // When the function completes, remember to dismiss the dialog.
                         // If the function successfully removes the team member, remove the team member from the displayed data and notify the Adapter that an item has been removed.
+                        val functionManage: Functions = taskApp.getFunctions(user)
+                        functionManage.callFunctionAsync(
+                            "removeTeamMember",
+                            listOf(obj.name),
+                            Document::class.java
+                        ) { result ->
+                            run {
+                                dialog.dismiss()
+                                if (result.isSuccess) {
+                                    Log.v(TAG(), "removed team member: ${result.get()}")
+                                    data.removeAt(position)
+                                    notifyItemRemoved(position)
+                                } else {
+                                    Log.e(TAG(), "failed to remove team member with:" + result.error)
+                                    Toast.makeText(parent.context, result.error.errorMessage, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     }
                     .setNegativeButton("Cancel") { dialog, _ ->
                         dialog.cancel()

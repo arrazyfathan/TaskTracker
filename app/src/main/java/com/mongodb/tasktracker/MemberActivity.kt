@@ -15,6 +15,7 @@ import com.mongodb.tasktracker.model.*
 import io.realm.mongodb.functions.Functions
 import org.bson.Document
 import java.util.*
+import kotlin.collections.ArrayList
 
 /*
 * MemberActivity: allows a user to view, add, and remove the members of their project.
@@ -55,6 +56,21 @@ class MemberActivity : AppCompatActivity() {
                 .setPositiveButton("Add User") { dialog, _ ->
                     dialog.dismiss()
                     // TODO: Add the new team member to the project by calling the `addTeamMember` Realm Function through `taskApp`.
+                    val functionManager: Functions = taskApp.getFunctions(user)
+                    functionManager.callFunctionAsync(
+                        "addTeamMember",
+                        listOf(input.text.toString()),
+                        Document::class.java
+                    ) { result ->
+                        if (result.isSuccess) {
+                            Log.v(TAG(), "Attemted to add team member. Result: ${result.get()}")
+                            setUpRecyclerView()
+                        } else {
+                            Log.e(TAG(), "Failed to add team member with:" + result.error)
+                            Toast.makeText(this, result.error.errorMessage, Toast.LENGTH_SHORT).show()
+                        }
+
+                    }
                 }
                 .setNegativeButton("Cancel") { dialog, _ ->
                     dialog.cancel()
@@ -74,5 +90,34 @@ class MemberActivity : AppCompatActivity() {
 
     private fun setUpRecyclerView() {
         // TODO: Call the `getMyTeamMembers` function to get a list of team members, then display them in a RecyclerView
+        val functionManager: Functions = taskApp.getFunctions(user)
+        // get team member by calling a Realm Function which return a list of memeber
+        functionManager.callFunctionAsync(
+            "getMyTeamMembers",
+            ArrayList<String>(),
+            ArrayList::class.java
+        ) { result ->
+            if (result.isSuccess) {
+                Log.v(
+                    TAG(),
+                    "Successfully fetched team members. Number of team members: ${result.get().size}"
+                )
+
+                // The `getMyTeamMember` function returns team members as Document object . Convert them into member object so the memberAdapter can display the data
+                this.members = ArrayList(result.get().map { item -> Member(item as Document) })
+                adapter = MemberAdapter(members, user!!)
+                recyclerView.layoutManager = LinearLayoutManager(this)
+                recyclerView.adapter = adapter
+                recyclerView.setHasFixedSize(true)
+                recyclerView.addItemDecoration(
+                    DividerItemDecoration(
+                        this,
+                        DividerItemDecoration.VERTICAL
+                    )
+                )
+            } else {
+                Log.e(TAG(), "Failed to get team members with: " + result.error)
+            }
+        }
     }
 }
